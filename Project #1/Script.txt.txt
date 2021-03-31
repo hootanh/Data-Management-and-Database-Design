@@ -1,0 +1,104 @@
+#Hootan Hosseinzadeganbushehri
+
+
+#Query1:
+	SELECT temp_topic.id AS topic_id, temp_topic.description AS topic_description, count(temp_blurt_analysis.blurtid) AS blurts_count
+	FROM topic AS temp_topic LEFT JOIN blurt_analysis AS temp_blurt_analysis ON temp_topic.id = temp_blurt_analysis.topicid 
+	GROUP BY temp_topic.id
+	ORDER BY temp_topic.id
+
+#Query2:
+	SELECT temp_user.name AS celebrity_name, count(temp_follow.follower) AS followers_count
+	FROM user AS temp_user LEFT JOIN follow AS temp_follow ON temp_user.email = temp_follow.followee
+	WHERE temp_user.type = "C" 
+	GROUP BY temp_user.name
+
+#Query3:
+	SELECT temp_user.name AS celebrity_name, count(temp_blurt.blurtid) AS blurts_count
+	FROM user AS temp_user LEFT JOIN blurt AS temp_blurt ON temp_user.email = temp_blurt.email
+	WHERE temp_user.type = "C"
+	GROUP BY temp_user.name
+	ORDER BY blurts_count DESC
+
+#Query4:
+	WITH target_celebrity (celebrity_names, zero_count) AS
+	(SELECT temp_user.name AS celebrity_name, count(followee) AS followers_count
+	FROM user AS temp_user LEFT JOIN follow AS temp_follow ON temp_user.email = temp_follow.follower
+	WHERE temp_user.type = "C" 
+	GROUP BY temp_user.name
+	HAVING followers_count = 0)
+	SELECT temp_result.celebrity_names
+	FROM target_celebrity AS temp_result
+
+#Query5:
+	WITH vendor_ambassador_followers(brand_ambassador_emails, followers_count) AS
+	(SELECT temp_user.email AS brand_ambassador_emails, count(temp_follow.follower) AS followers_count
+	FROM user AS temp_user LEFT JOIN follow AS temp_follow ON temp_user.email = temp_follow.followee
+	WHERE temp_user.type = "C" 
+	GROUP BY temp_user.email)
+	SELECT temp_vendor.name AS vendor_name, temp_vendor_ambassador.email AS brand_ambassador_emails, vendor_ambassador_followers.followers_count AS followers_count
+	FROM vendor AS temp_vendor LEFT JOIN vendor_ambassador AS temp_vendor_ambassador ON temp_vendor.id = temp_vendor_ambassador.vendorid, vendor_ambassador_followers
+	WHERE temp_vendor_ambassador.email = vendor_ambassador_followers.brand_ambassador_emails
+	GROUP BY temp_vendor.name
+
+#Query6:
+	WITH vendor_ad_gap (vendor_id, vendor_name, topic_id, advertisement_gap) AS
+	(SELECT temp_vendor.id AS vendor_id, temp_vendor.name AS vendor_name, temp_vendor_topics.topicid AS topic_id, count(distinct(temp_blurt_analysis.email)) AS advertisement_gap
+	FROM user_ad AS temp_user_ad, vendor_topics AS temp_vendor_topics, blurt_analysis AS temp_blurt_analysis, vendor AS temp_vendor
+	WHERE temp_blurt_analysis.email NOT IN 
+	(SELECT temp_user_ad.email
+	FROM vendor AS temp_vendors, user_ad AS temp_user_ad, vendor_topics AS temp_vendor_topic, advertisement AS temp_advertisement
+	WHERE temp_advertisement.vendorid = temp_vendor_topics.vendorid AND temp_user_ad.adid = temp_advertisement.id) AND temp_blurt_analysis.topicid = temp_vendor_topics.topicid AND temp_vendor.id = temp_vendor_topics.vendorid
+	GROUP BY temp_vendor.name
+	ORDER BY advertisement_gap DESC)
+	SELECT DISTINCT vendor_ad_gap.vendor_name, vendor_ad_gap.advertisement_gap
+	FROM vendor_ad_gap JOIN vendor AS temp_vendor 
+
+#Query7:
+	WITH users_tuple (name1, name2) AS
+	(SELECT DISTINCT temp_user1.name AS name1, temp_user2.name AS name2
+	FROM follow AS t_follow, user AS temp_user1, user AS temp_user2
+	WHERE temp_user1.email NOT IN 
+	(SELECT temp_follow.follower
+	FROM user AS users_AB, follow AS temp_follow
+	WHERE temp_follow.followee = temp_user2.email) AND EXISTS 
+	(SELECT temp_blurt_analysis.topicid
+	FROM user AS analysis_users, blurt_analysis AS temp_blurt_analysis
+	WHERE temp_blurt_analysis.topicid IN
+	(SELECT blurt_analysis_temp.topicid
+	FROM blurt_analysis AS blurt_analysis_temp
+	WHERE blurt_analysis_temp.email = temp_user2.email) AND temp_blurt_analysis.email = temp_user1.email)
+	AND temp_user1.email != temp_user2.email), users_checks (users_names, users_emails) AS
+	(SELECT users_temp_check1.name AS users_names, users_temp_check1.email AS users_emails
+	FROM user AS users_temp_check1, user AS users_temp_check2
+	WHERE users_temp_check1.email != users_temp_check2.email)
+	SELECT users_tuple.name1 AS user_A, users_tuple.name2 AS user_B
+	FROM users_tuple
+	ORDER BY users_tuple.name1, users_tuple.name2
+	LIMIT 1000
+
+#Query8:
+	WITH default_users (default_user_email) AS
+	(SELECT def_user.email AS default_user_email
+	FROM user AS def_user, follow AS def_follow
+	WHERE def_user.email = def_follow.followee), all_users (email_user1, email_user2, email_user3) AS
+	(SELECT DISTINCT temp_user1.email AS email_user1, temp_user2.email AS email_user2, temp_user3.email AS email_user3
+	FROM follow AS temp_follow1, follow AS temp_follow2, user AS temp_user1, user AS temp_user2, user AS temp_user3
+	WHERE temp_user1.email NOT IN
+	(SELECT temp_user.email
+	FROM follow AS temp_follow, default_users AS d_users, user AS temp_user
+	WHERE temp_follow.followee = temp_user3.email AND temp_user.email = temp_follow.follower) AND 
+	temp_user1.email != temp_user3.email AND temp_user3.email = temp_follow2.followee AND 
+	temp_user1.email = temp_follow1.follower AND temp_user2.email = temp_follow1.followee
+	AND temp_user2.email = temp_follow2.follower)
+	SELECT all_users.email_user1 AS user_A_email, all_users.email_user2 AS user_B_email, all_users.email_user3 AS user_C_email
+	FROM all_users
+	ORDER BY all_users.email_user1, all_users.email_user2, all_users.email_user3
+	LIMIT 1000
+
+#Query9:
+	SELECT temp_topic.id AS topic_id, temp_topic.description AS topic_name, temp_blurt.location AS state, count(temp_blurt_analysis.blurtid) AS blurts_count, avg(temp_blurt_analysis.sentiment) AS sentiment_average
+	FROM blurt AS temp_blurt, blurt_analysis AS temp_blurt_analysis LEFT JOIN topic AS temp_topic ON temp_topic.id = temp_blurt_analysis.topicid
+	WHERE temp_blurt.email = temp_blurt_analysis.email AND temp_blurt.blurtid = temp_blurt_analysis.blurtid
+	GROUP BY temp_topic.id, temp_topic.description, temp_blurt.location
+	HAVING 0 > sentiment_average
