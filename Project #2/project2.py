@@ -22,8 +22,7 @@ while choice != 0:
     print("5. Increase low-cost fares(≤ 200) by a factor.")
     print("6. Remove a seat reservation.")
     print("0. Exit")
-    choice = int(input(">"))
-    if choice == 1:
+    if (choice := int(input(">"))) == 1:
         dep_code = input("Please enter the airport code for the departure airport: ")
         des_code = input("Please enter the airport code for the destination airport: ")
         date_leg = input("What is the date of the flight in yyyy-mm-dd? ")
